@@ -49,7 +49,7 @@ class TestTidalAnalysis():
         # check you get a fail if two incompatible dfs are given
         data2.drop(columns=["Sea Level","Time"], inplace=True)
         data = join_data(data1, data2)
-        
+    
 
     def test_extract_year(self):
         

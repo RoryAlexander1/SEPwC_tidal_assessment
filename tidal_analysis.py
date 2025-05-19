@@ -43,9 +43,27 @@ def extract_single_year_remove_mean(year, data):
 
 
 def extract_section_remove_mean(start, end, data):
-
-
-    return 
+    """
+    Extracts a time section of tidal data between two dates, removes the mean
+    from the sea level column, and returns the adjusted data
+    """  
+    
+    
+    start_date = pd.to_datetime(start, format='%Y%m%d')
+    end_date = pd.to_datetime(end, format='%Y%m%d')
+    
+    # Adjust end_date to include tidal data from the last day
+    end_date = end_date + pd.Timedelta('1 day') - pd.Timedelta('1 hour')
+    
+    section_data = data[(data.index >= start_date) & (data.index <= end_date)]
+    
+    print(data.index.min(), data.index.max())
+    print(data.index.freq)
+    print(data.loc["1946-12-15":"1947-03-10"].shape)
+    
+    section_data['Sea Level'] = section_data['Sea Level'] - section_data['Sea Level'].mean()
+    
+    return section_data 
 
 
 def join_data(data1, data2):

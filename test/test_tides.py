@@ -105,8 +105,7 @@ class TestTidalAnalysis():
         data2 = read_tidal_data(gauge_files[0])
         data = join_data(data1, data2)
 
-        data_segment =extract_section_remove_mean("19460115", "19470310", data)
-
+        data_segment = extract_section_remove_mean("19460115", "19470310", data)
         constituents  = ['M2', 'S2']
         tz = pytz.timezone("utc")
         start_datetime = datetime.datetime(1946,1,15,0,0,0, tzinfo=tz)

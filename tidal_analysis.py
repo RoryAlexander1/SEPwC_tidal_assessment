@@ -8,6 +8,7 @@ import wget
 import os
 import numpy as np
 import uptide
+from utide import solve
 import pytz
 import math
 
@@ -47,8 +48,6 @@ def extract_section_remove_mean(start, end, data):
     Extracts a time section of tidal data between two dates, removes the mean
     from the sea level column, and returns the adjusted data
     """  
-    
-    
     start_date = pd.to_datetime(start, format='%Y%m%d')
     end_date = pd.to_datetime(end, format='%Y%m%d')
     
@@ -86,14 +85,39 @@ def join_data(data1, data2):
 
 def sea_level_rise(data):
 
+    timestamps = (data.index - data.index[0]).total_seconds()
+    slope, intercept = np.polyfit(timestamps, data ['Sea Level'], 1)
+    p_value = np.corrcoef(timestamps, data['Sea Level'])[0, 1]
                                                      
-    return 
+    return slope, intercept, p_value
 
 def tidal_analysis(data, constituents, start_datetime):
+        
+    if data.index.tz is not None:
+        data.index = data.index.tz_convert("utc").tz_localize(None)
+        
+    start_datetime = pd.to_datetime(start_datetime)
+    if start_datetime.tzinfo is not None:
+        start_datetime = start_datetime.tz_convert("utc").tz_localize(None)
+    
+    timestamps = (data.index - start_datetime).total_seconds()
+    
+    result = solve(timestamps, data['Sea Level'].values, lat=57.15, method='ols', conf_int='linear')
 
+    print ("Available consituents:", result.name)
 
-    return 
+    amp_dict = dict(zip(result.name, result.A))
+    pha_dict = dict(zip(result.name, result.g))
 
+    try:
+        amplitudes = [amp_dict[c] for c in constituents]
+        phases = [pha_dict[c] for c in constituents]
+    except KeyError as e:
+        raise KeyError(f"Requested constituent {e} not found in UTide result. Available: {list(amp_dict.keys())}")
+    
+    return amplitudes, phases
+    
+ 
 def get_longest_contiguous_data(data):
 
 

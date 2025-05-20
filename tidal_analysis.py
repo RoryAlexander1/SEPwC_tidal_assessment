@@ -12,6 +12,7 @@ import pytz
 import math
 from matplotlib.dates import date2num
 from scipy.stats import linregress
+import glob
 
 def read_tidal_data(filename):
     # Can safely ignore this syntax warning as pandas uses \s+ as 'regular expression'
@@ -119,15 +120,16 @@ def tidal_analysis(data, constituents, start_datetime):
     amp, pha = uptide.harmonic_analysis(tide, data['Sea Level'], timestamps)
    
     return amp, pha
-    
  
 def get_longest_contiguous_data(data):
 
-
-    return 
+    is_valid = ~data['Sea Level'].isnull()
+    contiguous_blocks = is_valid.astype(int).groupby(data.index.to_period('H')).sum()
+    max_block = contiguous_blocks.idmax()
+    return data[max_block.start_time:max_block.end_time]
 
 if __name__ == '__main__':
-    """
+    
     parser = argparse.ArgumentParser(
                      prog="UK Tidal analysis",
                      description="Calculate tidal constiuents and RSL from tide gauge data",
@@ -144,13 +146,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
     dirname = args.directory
     verbose = args.verbose    
-"""
-    gauge_files = ['data/1946ABE.txt', 'data/1947ABE.txt']
-    data1 = read_tidal_data(gauge_files[1])
-    data2 = read_tidal_data(gauge_files[0])
-    data = join_data(data1, data2)
-
-    slope, p_value = sea_level_rise(data)
     
-    print(slope)
-    print(p_value)
+    # Use glob to get all files in the directory
+    gauge_files = glob.glob(f"{dirname}/*.txt")
+    
+    all_data = None
+    for file in gauge_files:
+        file_data = read_tidal_data(file)
+        all_data = join_data(all_data, file_data) if all_data is not None else file_data
+        
+    start_year = all_data.index.year.min()
+    end_year = all_data.index.year.max()
+    
+    print("The rate of sea level rise (m/yr) and p-value")
+    for year in range (start_year,end_year + 1):
+        year_data = extract_single_year_remove_mean(year, all_data)
+        slope, p_value = sea_level_rise(year_data)
+        print(f"{year}: {slope:.4f} m/yr, p-value: {p_value:.4f}")
+        
+    year_data.loc[:, 'Sea Level'] = year_data['Sea Level'] - year_data['Sea Level'].mean()

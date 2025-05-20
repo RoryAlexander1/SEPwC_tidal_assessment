@@ -4,7 +4,6 @@
 import argparse
 import pandas as pd
 import datetime
-import wget
 import os
 import numpy as np
 import uptide
@@ -15,7 +14,6 @@ import math
 def read_tidal_data(filename):
     # Can safely ignore this syntax warning as pandas uses \s+ as 'regular expression'
     tide_data = pd.read_csv(filename, skiprows=10, sep='\s+')
-
     tide_data = tide_data.iloc[:, [1, 2, 3, 4]]
     
     # Clean up the column names by removing the extra characters
@@ -25,7 +23,6 @@ def read_tidal_data(filename):
     tide_data.set_index('datetime',inplace=True)
     
     # Remove the 'M' from the numerical columns and convert to numeric
-    
     tide_data['Sea Level'] = pd.to_numeric(tide_data['Sea Level'], errors='coerce')
     tide_data['Residual'] = pd.to_numeric(tide_data['Residual'], errors='coerce')
     
@@ -55,11 +52,7 @@ def extract_section_remove_mean(start, end, data):
     end_date = end_date + pd.Timedelta('1 day') - pd.Timedelta('1 hour')
     
     section_data = data[(data.index >= start_date) & (data.index <= end_date)]
-    
-    print(data.index.min(), data.index.max())
-    print(data.index.freq)
-    print(data.loc["1946-12-15":"1947-03-10"].shape)
-    
+     
     section_data['Sea Level'] = section_data['Sea Level'] - section_data['Sea Level'].mean()
     
     return section_data 
@@ -76,23 +69,37 @@ def join_data(data1, data2):
         """
         
     joined_data = pd.concat([data1, data2], axis=0)
-    
     joined_data.sort_index(inplace=True)
 
     return joined_data
 
 
-
 def sea_level_rise(data):
 
+    timestamps = (data.index - data.index[0]).total_seconds()
+    slope, _ = np.polyfit(timestamps, data ['Sea Level'], 1)
+    corr = np.corrcoef(timestamps, data ['Sea Level'])[0, 1]
+    return slope, corr    
+
+    """
     timestamps = (data.index - data.index[0]).total_seconds()
     slope, intercept = np.polyfit(timestamps, data ['Sea Level'], 1)
     p_value = np.corrcoef(timestamps, data['Sea Level'])[0, 1]
                                                      
     return slope, intercept, p_value
-
+    """
+    
 def tidal_analysis(data, constituents, start_datetime):
         
+  
+    
+    tide = uptide.Tides(['M2', 'S2'])
+    tide.set_initial_time(start_datetime)
+    amp, pha = uptide.harmonic_analysis(tide, data['Sea Level'], data.index)
+    
+    print(amp)
+    print(pha)
+    """
     if data.index.tz is not None:
         data.index = data.index.tz_convert("utc").tz_localize(None)
         
@@ -105,6 +112,8 @@ def tidal_analysis(data, constituents, start_datetime):
     result = solve(timestamps, data['Sea Level'].values, lat=57.15, method='ols', conf_int='linear')
 
     print ("Available consituents:", result.name)
+    
+    print ("result", result.name)
 
     amp_dict = dict(zip(result.name, result.A))
     pha_dict = dict(zip(result.name, result.g))
@@ -114,7 +123,7 @@ def tidal_analysis(data, constituents, start_datetime):
         phases = [pha_dict[c] for c in constituents]
     except KeyError as e:
         raise KeyError(f"Requested constituent {e} not found in UTide result. Available: {list(amp_dict.keys())}")
-    
+    """
     return amplitudes, phases
     
  
@@ -124,7 +133,7 @@ def get_longest_contiguous_data(data):
     return 
 
 if __name__ == '__main__':
-    
+    """
     parser = argparse.ArgumentParser(
                      prog="UK Tidal analysis",
                      description="Calculate tidal constiuents and RSL from tide gauge data",
@@ -141,5 +150,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     dirname = args.directory
     verbose = args.verbose    
+"""
+    gauge_files = ['data/1946ABE.txt', 'data/1947ABE.txt']
+    data1 = read_tidal_data(gauge_files[1])
+    data2 = read_tidal_data(gauge_files[0])
+    data = join_data(data1, data2)
 
+    data_segment = extract_section_remove_mean("19460115", "19470310", data)
+    constituents  = ['M2', 'S2']
+    tz = pytz.timezone("utc")
+    start_datetime = datetime.datetime(1946,1,15,0,0,0, tzinfo=tz)
+    amp,pha = tidal_analysis(data_segment, constituents, start_datetime)
 

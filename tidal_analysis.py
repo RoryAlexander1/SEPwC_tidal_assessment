@@ -5,11 +5,13 @@ import argparse
 import pandas as pd
 import datetime
 import os
-import numpy as np
+import numpy as np 
 import uptide
 from utide import solve
 import pytz
 import math
+from matplotlib.dates import date2num
+from scipy.stats import linregress
 
 def read_tidal_data(filename):
     # Can safely ignore this syntax warning as pandas uses \s+ as 'regular expression'
@@ -76,10 +78,17 @@ def join_data(data1, data2):
 
 def sea_level_rise(data):
 
-    timestamps = (data.index - data.index[0]).total_seconds()
-    slope, _ = np.polyfit(timestamps, data ['Sea Level'], 1)
-    corr = np.corrcoef(timestamps, data ['Sea Level'])[0, 1]
-    return slope, corr    
+    #Filter out NaN values from the sea level data
+    data = data.dropna(subset=['Sea Level'])
+   
+    timestamps = date2num(data.index)
+    
+    slope, _, _, p_value, _ = linregress(timestamps, data['Sea Level'])
+    
+    #coefficient = np.polyfit(timestamps, data ['Sea Level'], 1)
+    #p_value = np.corrcoef(timestamps, data ['Sea Level'])[0, 1]
+    
+    return slope, p_value    
 
     """
     timestamps = (data.index - data.index[0]).total_seconds()
@@ -90,41 +99,26 @@ def sea_level_rise(data):
     """
     
 def tidal_analysis(data, constituents, start_datetime):
-        
-  
     
-    tide = uptide.Tides(['M2', 'S2'])
+    tide = uptide.Tides(constituents)
     tide.set_initial_time(start_datetime)
-    amp, pha = uptide.harmonic_analysis(tide, data['Sea Level'], data.index)
     
-    print(amp)
-    print(pha)
-    """
+    # Transforming data.index into seconds from start_datetime
     if data.index.tz is not None:
-        data.index = data.index.tz_convert("utc").tz_localize(None)
+        data.index = data.index.tz_convert("utc").tz_localize(None)     
         
     start_datetime = pd.to_datetime(start_datetime)
     if start_datetime.tzinfo is not None:
         start_datetime = start_datetime.tz_convert("utc").tz_localize(None)
-    
-    timestamps = (data.index - start_datetime).total_seconds()
-    
-    result = solve(timestamps, data['Sea Level'].values, lat=57.15, method='ols', conf_int='linear')
-
-    print ("Available consituents:", result.name)
-    
-    print ("result", result.name)
-
-    amp_dict = dict(zip(result.name, result.A))
-    pha_dict = dict(zip(result.name, result.g))
-
-    try:
-        amplitudes = [amp_dict[c] for c in constituents]
-        phases = [pha_dict[c] for c in constituents]
-    except KeyError as e:
-        raise KeyError(f"Requested constituent {e} not found in UTide result. Available: {list(amp_dict.keys())}")
-    """
-    return amplitudes, phases
+ 
+    #Filter out NaN values from the sea level data
+    data = data.dropna(subset=['Sea Level'])
+ 
+    timestamps = (data.index - start_datetime).total_seconds()    
+  
+    amp, pha = uptide.harmonic_analysis(tide, data['Sea Level'], timestamps)
+   
+    return amp, pha
     
  
 def get_longest_contiguous_data(data):
@@ -156,9 +150,7 @@ if __name__ == '__main__':
     data2 = read_tidal_data(gauge_files[0])
     data = join_data(data1, data2)
 
-    data_segment = extract_section_remove_mean("19460115", "19470310", data)
-    constituents  = ['M2', 'S2']
-    tz = pytz.timezone("utc")
-    start_datetime = datetime.datetime(1946,1,15,0,0,0, tzinfo=tz)
-    amp,pha = tidal_analysis(data_segment, constituents, start_datetime)
-
+    slope, p_value = sea_level_rise(data)
+    
+    print(slope)
+    print(p_value)

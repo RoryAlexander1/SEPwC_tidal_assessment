@@ -4,14 +4,14 @@
 
 # import the modules you need here
 import argparse
+import glob
+import os
 import pandas as pd
-import datetime
 import numpy as np
 import uptide
-import pytz
 from matplotlib.dates import date2num
 from scipy.stats import linregress
-import glob
+import matplotlib.pyplot as plt
 
 def read_tidal_data(filename):
     """Function reads tidal data from a file and return cleaned data set."""
@@ -114,10 +114,18 @@ def tidal_analysis(data, constituents, start_datetime):
 def get_longest_contiguous_data(data):
     """Get the longest contiguous block of valid Sea Level data."""
 
-    is_valid = ~data['Sea Level'].isnull()
-    contiguous_blocks = is_valid.astype(int).groupby(data.index.to_period('H')).sum()
-    max_block = contiguous_blocks.idmax()
-    return data[max_block.start_time:max_block.end_time]
+    data = data.sort_index()
+    time_diff = data.index.to_series().diff().dt.total_seconds()
+    group = (time_diff > 3600 * 24).cumsum() # Create groups for contiguous blocks
+
+    longest_group = data.groupby(group).size().idxmax()
+
+    longest_data = data[group == longest_group]
+
+    print(f"Longest contiguous block of data spans {len(longest_data)} entries"
+          f"from {longest_data.index[0]} to {longest_data.index[-1]}.")
+
+    return longest_data
 
 if __name__ == '__main__':
 
@@ -140,16 +148,45 @@ if __name__ == '__main__':
     # Use glob to get all files in the directory
     gauge_files = glob.glob(f"{dirname}/*.txt")
 
-    all_data = None
+    ALL_DATA = None
     for file in gauge_files:
         file_data = read_tidal_data(file)
-        all_data = join_data(all_data, file_data) if all_data is not None else file_data
+        ALL_DATA = join_data(ALL_DATA, file_data) if ALL_DATA is not None else file_data
 
-    start_year = all_data.index.year.min()
-    end_year = all_data.index.year.max()
+    start_year = ALL_DATA.index.year.min()
+    end_year = ALL_DATA.index.year.max()
+
+    years_index = []
+    rates_of_change = []
 
     print("The rate of sea level rise (m/yr) and p-value")
-    for year in range (start_year,end_year + 1):
-        year_data = extract_single_year_remove_mean(year, all_data)
-        slope, p_value = sea_level_rise(year_data)
-        print(f"{year}: {slope:.4f} m/yr, p-value: {p_value:.4f}")
+    for year_index in range (start_year,end_year + 1):
+        year_for_data = extract_single_year_remove_mean(year_index, ALL_DATA)
+        rate_of_change, significance_level = sea_level_rise(year_for_data)
+        print(f"{year_index}: {rate_of_change:.4f} m/yr, p-value: {significance_level:.4f}")
+        years_index.append(year_index)
+        rates_of_change.append(rate_of_change)
+
+    # Ensure the output directory exists
+
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Save the tidal rise per year plot graph
+
+    plt.figure(figsize=(10,6))
+    plt.plot(years_index, rates_of_change, marker='o', linestyle='-',
+             color='b', label='Tidal Rise (m/yr)')
+    plt.xlabel('Year')
+    plt.ylabel('Tidal Rise (m/yr)')
+    plt.title('Tidal Rise Per Year')
+    plt.xticks(years_index, [int(year_index) for year_index in years_index])
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.annotate('local max', xy=(2, 1), xytext=(3, 1.5),
+             arrowprops={"facecolor": 'black', "shrink": 0.05},)
+    plot_path = os.path.join(output_dir,"tidal_rise_per_year.png")
+    plt.savefig(plot_path)
+    print(f"Tidal rise per year plot saved to {plot_path}")
+    plt.close()

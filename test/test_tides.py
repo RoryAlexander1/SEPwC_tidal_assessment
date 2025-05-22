@@ -8,6 +8,8 @@ from pylint.reporters import CollectingReporter
 from dataclasses import asdict
 import pandas as pd
 import numpy as np
+import pytz #Not orinially imported on test script
+import datetime #Not orinially imported on test script
 
 class TestTidalAnalysis():
 

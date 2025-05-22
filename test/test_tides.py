@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 
 class TestTidalAnalysis():
-    
+
     def test_reading_data(self):
         tidal_file = "data/1947ABE.txt"
         
@@ -125,7 +125,7 @@ class TestTidalAnalysis():
 
         slope, p_value = sea_level_rise(data)
         
-        assert slope == pytest.approx(2.94e-05,abs=1e-7)
+        assert slope == pytest.approx(2.94e-05,abs=1e-7) #
         assert p_value == pytest.approx(0.427,abs=0.1)
         
 

@@ -6,7 +6,6 @@
 import argparse
 import pandas as pd
 import datetime
-import os
 import numpy as np
 import uptide
 import pytz
@@ -14,8 +13,8 @@ from matplotlib.dates import date2num
 from scipy.stats import linregress
 import glob
 
-
 def read_tidal_data(filename):
+    """Function reads tidal data from a file and return cleaned data set."""
     # Can safely ignore this syntax warning as pandas uses \s+ as 'regular expression'
     tide_data = pd.read_csv(filename, skiprows=10, delim_whitespace=True)
     tide_data = tide_data.iloc[:, [1, 2, 3, 4]]
@@ -34,20 +33,16 @@ def read_tidal_data(filename):
     return tide_data
 
 def extract_single_year_remove_mean(year, data):
-    """
-    Extracts data for a specific year from dataframe with datetimeindex
-    and removes the mean of the sea level column from that year
-    """
+    """Extracts data for a specific year from dataframe with datetimeindex
+    and removes the mean of the sea level column from that year."""
     year_data = data[data.index.year == int(year)].copy()
     year_data['Sea Level'] = year_data['Sea Level'] - year_data['Sea Level'].mean()
 
     return year_data
 
 def extract_section_remove_mean(start, end, data):
-    """
-    Extracts a time section of tidal data between two dates, removes the mean
-    from the sea level column, and returns the adjusted data
-    """
+    """Extracts a time section of tidal data between two dates, removes the mean
+    from the sea level column, and returns the adjusted data."""
     start_date = pd.to_datetime(start, format='%Y%m%d')
     end_date = pd.to_datetime(end, format='%Y%m%d')
 
@@ -61,13 +56,14 @@ def extract_section_remove_mean(start, end, data):
     return section_data
 
 def join_data(data1, data2):
+    """Joins two dataframes together."""
 
     if not np.array_equal(data1.columns, data2.columns):
         return data1
 
-    """ Future improvement: could raise an error when data is incompatible
-    (Returning valid data for now to ensure test passes)
-    raise Exception("Can't join data as columns do not match")"""
+    # Future improvement: could raise an error when data is incompatible
+    # (Returning valid data for now to ensure test passes)
+    # raise Exception("Can't join data as columns do not match")
 
     joined_data = pd.concat([data1, data2], axis=0)
     joined_data.sort_index(inplace=True)
@@ -75,22 +71,25 @@ def join_data(data1, data2):
     return joined_data
 
 def sea_level_rise(data):
-
-    """Calculate sea level rise using linear regression"""
-
-    #Filter out NaN values from the sea level data
+    """Calculates sea level rise using linear regression.
+    Returns the slope in meters per year and the p-value."""
+    # Filter out NaN values from the 'Sea Level' column and sort by index
     data = data.dropna(subset=['Sea Level'])
     data = data.sort_index()
 
+    # If data is empty after dropping NaNs, return default values
     if data.empty:
         return 0.0, 1.0
 
+    # Convert datetime index to seconds since the first timestamp.
+    # This provides a continuous numerical x-axis for linear regression.
     timestamps = date2num(data.index)
     slope, _, _, p_value, _ = linregress(timestamps, data['Sea Level'])
 
     return slope, p_value
 
 def tidal_analysis(data, constituents, start_datetime):
+    """Performs tidal analysis using uptide."""
 
     tide = uptide.Tides(constituents)
     tide.set_initial_time(start_datetime)
@@ -113,7 +112,7 @@ def tidal_analysis(data, constituents, start_datetime):
     return amp, pha
 
 def get_longest_contiguous_data(data):
-    """Get the longest contiguous block of valid Sea Level data"""
+    """Get the longest contiguous block of valid Sea Level data."""
 
     is_valid = ~data['Sea Level'].isnull()
     contiguous_blocks = is_valid.astype(int).groupby(data.index.to_period('H')).sum()
@@ -125,8 +124,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
                      prog="UK Tidal analysis",
                      description="Calculate tidal constiuents and RSL from tide gauge data",
-                     epilog="Copyright 2024, Jon Hill"
-                     )
+                     epilog="Copyright 2024, Jon Hill")
 
     parser.add_argument("directory",
                     help="the directory containing txt files with data")
@@ -155,5 +153,3 @@ if __name__ == '__main__':
         year_data = extract_single_year_remove_mean(year, all_data)
         slope, p_value = sea_level_rise(year_data)
         print(f"{year}: {slope:.4f} m/yr, p-value: {p_value:.4f}")
-
-    year_data.loc[:, 'Sea Level'] = year_data['Sea Level'] - year_data['Sea Level'].mean()

@@ -148,10 +148,10 @@ def get_gaps_in_data(data, hours=6):
 
 def get_sea_level_rise_per_year(data):
     """Calculate the rate of sea level rise per year and return as a DataFrame."""
-    start_year = data.index.year.min()
-    end_year = data.index.year.max()
+    start = data.index.year.min()
+    end = data.index.year.max()
 
-    years_index = range(start_year, end_year + 1)
+    years_index = range(start, end + 1)
 
     def calculate_for_year(year):
         year_for_data = extract_single_year_remove_mean(year, data)
@@ -190,6 +190,9 @@ if __name__ == '__main__':
     # Use glob to get all files in the directory
     gauge_files = glob.glob(f"{dirname}/*.txt")
 
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
+
     ALL_DATA = None
     for file in gauge_files:
         file_data = read_tidal_data(file)
@@ -218,22 +221,32 @@ if __name__ == '__main__':
                   f"(Duration: {row['Gap Duration (seconds)'] / 3600:.2f} hours)")
     else:
         print("No gaps more than 24 hours in data.")
+
+    print("\n\n---- Sea Level Rise (Whole Measurement Period) ----")
+    first_year_level = ALL_DATA[ALL_DATA.index.year == int(start_year)]["Sea Level"].mean()
+    print(f"Averge sea level in {start_year}: {first_year_level:.3f} m")
+    last_year_level = ALL_DATA[ALL_DATA.index.year == int(end_year)]["Sea Level"].mean()
+    print(f"Averge sea level in {end_year}: {last_year_level:.3f} m")
+    print(f"Sea level rise from {start_year} to {end_year}: "
+          f"{last_year_level - first_year_level:.3f} m")
+
+    print("\n\n---- Sea Level Rise Per Year ----")
     sea_level_rise_per_year = get_sea_level_rise_per_year(ALL_DATA)
 
-    # Ensure the output directory exists
+    for year_index, row in sea_level_rise_per_year.iterrows():
+        print(f"{year_index}: Rate of Change = {row['Rate of Change']:.5f} m/yr, "
+              f"Significance Level = {row['Significance Level']:.5f}")
 
-    output_dir = os.path.join(os.path.dirname(__file__), "output")
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Save the tidal rise per year plot graph
+    print("\nCreating tidal rise per year plot...")
 
     plt.figure(figsize=(10,6))
-    plt.plot(sea_level_rise_per_year.index, sea_level_rise_per_year["Rate of Change"], marker='o', linestyle='-',
-             color='b', label='Tidal Rise (m/yr)')
+    plt.plot(sea_level_rise_per_year.index, sea_level_rise_per_year["Rate of Change"],
+             marker='o', linestyle='-', color='b', label='Tidal Rise (m/yr)')
     plt.xlabel('Year')
     plt.ylabel('Tidal Rise (m/yr)')
     plt.title('Tidal Rise Per Year')
-    plt.xticks(sea_level_rise_per_year.index, [int(year_index) for year_index in sea_level_rise_per_year.index])
+    plt.xticks(sea_level_rise_per_year.index,
+               [int(year_index) for year_index in sea_level_rise_per_year.index])
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -243,3 +256,8 @@ if __name__ == '__main__':
     plt.savefig(plot_path)
     print(f"Tidal rise per year plot saved to {plot_path}")
     plt.close()
+
+    print("\n\n---- Tidal Analysis ----")
+    amp_result, pha_result = tidal_analysis(ALL_DATA, ["M2", "S2"], ALL_DATA.index[0])
+    print(f"M2 tidal constituent: {amp_result[0]:.3f}")
+    print(f"S2 tidal constituent: {amp_result[1]:.3f}")

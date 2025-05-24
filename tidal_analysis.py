@@ -244,7 +244,7 @@ if __name__ == '__main__':
              marker='o', linestyle='-', color='b', label='Tidal Rise (m/yr)')
     plt.xlabel('Year')
     plt.ylabel('Tidal Rise (m/yr)')
-    plt.title('Tidal Rise Per Year')
+    plt.title(f'Tidal Rise Per Year ({location})')
     plt.xticks(sea_level_rise_per_year.index,
                [int(year_index) for year_index in sea_level_rise_per_year.index])
     plt.grid(True)

@@ -127,6 +127,29 @@ def get_longest_contiguous_data(data):
 
     return longest_data
 
+def get_sea_level_rise_per_year(data):
+    """Calculate the rate of sea level rise per year and return as a DataFrame."""
+    start_year = data.index.year.min()
+    end_year = data.index.year.max()
+
+    years_index = range(start_year, end_year + 1)
+
+    def calculate_for_year(year):
+        year_for_data = extract_single_year_remove_mean(year, data)
+        return sea_level_rise(year_for_data)
+
+    results = list(map(calculate_for_year, years_index))
+    rates_of_change, significance_levels = zip(*results)
+
+    # Create a DataFrame with the results
+    result_df = pd.DataFrame({
+        'Rate of Change': rates_of_change,
+        'Significance Level': significance_levels
+    }, index=years_index)
+
+    result_df.index.name = 'Year'
+    return result_df
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
@@ -156,16 +179,7 @@ if __name__ == '__main__':
     start_year = ALL_DATA.index.year.min()
     end_year = ALL_DATA.index.year.max()
 
-    years_index = []
-    rates_of_change = []
-
-    print("The rate of sea level rise (m/yr) and p-value")
-    for year_index in range (start_year,end_year + 1):
-        year_for_data = extract_single_year_remove_mean(year_index, ALL_DATA)
-        rate_of_change, significance_level = sea_level_rise(year_for_data)
-        print(f"{year_index}: {rate_of_change:.4f} m/yr, p-value: {significance_level:.4f}")
-        years_index.append(year_index)
-        rates_of_change.append(rate_of_change)
+    sea_level_rise_per_year = get_sea_level_rise_per_year(ALL_DATA)
 
     # Ensure the output directory exists
 
@@ -175,12 +189,12 @@ if __name__ == '__main__':
     # Save the tidal rise per year plot graph
 
     plt.figure(figsize=(10,6))
-    plt.plot(years_index, rates_of_change, marker='o', linestyle='-',
+    plt.plot(sea_level_rise_per_year.index, sea_level_rise_per_year["Rate of Change"], marker='o', linestyle='-',
              color='b', label='Tidal Rise (m/yr)')
     plt.xlabel('Year')
     plt.ylabel('Tidal Rise (m/yr)')
     plt.title('Tidal Rise Per Year')
-    plt.xticks(years_index, [int(year_index) for year_index in years_index])
+    plt.xticks(sea_level_rise_per_year.index, [int(year_index) for year_index in sea_level_rise_per_year.index])
     plt.grid(True)
     plt.legend()
     plt.tight_layout()

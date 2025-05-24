@@ -111,21 +111,40 @@ def tidal_analysis(data, constituents, start_datetime):
 
     return amp, pha
 
-def get_longest_contiguous_data(data):
+def get_longest_contiguous_data(data, hours=6):
     """Get the longest contiguous block of valid Sea Level data."""
 
-    data = data.sort_index()
+    # Ensure data is sorted by index and drop rows with NaN in Sea Level
+    data = data.dropna(subset=['Sea Level']).sort_index()
+
     time_diff = data.index.to_series().diff().dt.total_seconds()
-    group = (time_diff > 3600 * 24).cumsum() # Create groups for contiguous blocks
+    group = (time_diff > (hours * 3600)).cumsum()
 
     longest_group = data.groupby(group).size().idxmax()
 
     longest_data = data[group == longest_group]
 
-    print(f"Longest contiguous block of data spans {len(longest_data)} entries"
-          f"from {longest_data.index[0]} to {longest_data.index[-1]}.")
-
     return longest_data
+
+def get_gaps_in_data(data, hours=6):
+    """Identify gaps in the data longer than six hours and return a DataFrame with gap 
+    information."""
+    # Ensure data is sorted by index and drop rows with NaN in Sea Level
+    data = data.dropna(subset=['Sea Level']).sort_index()
+
+    # Calculate time differences between consecutive entries
+    time_diff = data.index.to_series().diff().dt.total_seconds().iloc[1:]
+
+    gaps = time_diff[time_diff > (hours * 3600)]
+
+    # Create a DataFrame for gaps with Start, End, and Gap Duration
+    gaps_df = pd.DataFrame({
+        'Start': gaps.index,
+        'End': gaps.index + pd.to_timedelta(gaps.values, unit='s'),
+        'Gap Duration (seconds)': gaps.values
+    })
+
+    return gaps_df
 
 def get_sea_level_rise_per_year(data):
     """Calculate the rate of sea level rise per year and return as a DataFrame."""
@@ -179,6 +198,26 @@ if __name__ == '__main__':
     start_year = ALL_DATA.index.year.min()
     end_year = ALL_DATA.index.year.max()
 
+    print("\n\n---- Dataset Information ----")
+    location = os.path.basename(os.path.normpath(dirname)).capitalize()
+    print("Location: ", location)
+    print("First measurement: ", ALL_DATA.index.min())
+    print("Last measurement: ", ALL_DATA.index.max())
+    print("Total measurements: ", ALL_DATA.shape[0])
+
+    longest_contiguous_data = get_longest_contiguous_data(ALL_DATA)
+    print(f"Longest contiguous block of data spans {len(longest_contiguous_data)} entries "
+          f"from {longest_contiguous_data.index[0]} to {longest_contiguous_data.index[-1]}.")
+
+    print("\n\n---- Dataset Gaps (More than 24hrs) ----")
+    data_gaps = get_gaps_in_data(ALL_DATA, 24)
+    if not data_gaps.empty:
+        print("Gaps in data:")
+        for _, row in data_gaps.iterrows():
+            print(f"From {row['Start']} to {row['End']} "
+                  f"(Duration: {row['Gap Duration (seconds)'] / 3600:.2f} hours)")
+    else:
+        print("No gaps more than 24 hours in data.")
     sea_level_rise_per_year = get_sea_level_rise_per_year(ALL_DATA)
 
     # Ensure the output directory exists

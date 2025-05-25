@@ -29,7 +29,6 @@ def read_tidal_data(filename):
     tide_data['Sea Level'] = pd.to_numeric(tide_data['Sea Level'], errors='coerce')
     tide_data['Residual'] = pd.to_numeric(tide_data['Residual'], errors='coerce')
 
-    # Opportunity to use Gemini to clear up the above three sections
     return tide_data
 
 def extract_single_year_remove_mean(year, data):
@@ -250,8 +249,6 @@ if __name__ == '__main__':
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    plt.annotate('local max', xy=(2, 1), xytext=(3, 1.5),
-             arrowprops={"facecolor": 'black', "shrink": 0.05},)
     plot_path = os.path.join(output_dir,"tidal_rise_per_year.png")
     plt.savefig(plot_path)
     print(f"Tidal rise per year plot saved to {plot_path}")

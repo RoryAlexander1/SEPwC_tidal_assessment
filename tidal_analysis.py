@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 def read_tidal_data(filename):
     """Function reads tidal data from a file and return cleaned data set."""
     # Can safely ignore this syntax warning as pandas uses \s+ as 'regular expression'
-    tide_data = pd.read_csv(filename, skiprows=10, sep='\s+')
+    tide_data = pd.read_csv(filename, skiprows=10, sep='\s+') # pylint: disable=anomalous-backslash-in-string
     tide_data = tide_data.iloc[:, [1, 2, 3, 4]]
 
     # Clean up the column names by removing the extra characters
